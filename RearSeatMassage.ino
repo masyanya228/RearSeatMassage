@@ -1,7 +1,9 @@
 #include <Wire.h>
+
+bool isDebug=false;
+
 // адрес
 #define SLAVE_ADDR 10
-
 // команды
 #define REG_L_MODE 0x01
 #define REG_L_GetStatus 0x02
@@ -10,18 +12,21 @@
 #define REG_GetErrorCount 0x05
 #define REG_GetNextError 0x06
 
-#define PIN_L_SWITCH 1
-#define PIN_R_SWITCH 1
+#define PIN_L_SWITCH A6
+#define PIN_R_SWITCH A7
 
-#define PIN_L_IND_1 1
-#define PIN_L_IND_2 1
-#define PIN_R_IND_1 1
-#define PIN_R_IND_2 1
+#define PIN_L_IND_1 5
+#define PIN_L_IND_2 6
+#define PIN_R_IND_1 7
+#define PIN_R_IND_2 8
+
+int L_Mode=0;
+int R_Mode=0;
+int LastCheck=0;
 
 // последняя выбранная команда
 // в обработчике приёма
 uint8_t cmd = 0;
-
 // счётчик сообщений
 uint8_t counter = 0;
 
@@ -57,9 +62,17 @@ void requestCb() {
           break;
     }
 }
+
 void setup() {
+  LastCheck=millis();
+  pinMode(PIN_L_SWITCH, OUTPUT);
+  pinMode(PIN_R_SWITCH, OUTPUT);
+  pinMode(PIN_L_IND_1, INPUT);
+  pinMode(PIN_L_IND_2, INPUT);
+  pinMode(PIN_R_IND_1, INPUT);
+  pinMode(PIN_R_IND_2, INPUT);
+  
   Serial.begin(9600);
-  // put your setup code here, to run once:
   Wire.begin(SLAVE_ADDR);
 
   Wire.onReceive(receiveCb);
@@ -67,6 +80,12 @@ void setup() {
 }
 
 void loop() {
+  int now = millis();
+  if(now-LastCheck>1000*5)
+  {
+    L_Mode=GetIndicator(0);
+    R_Mode=GetIndicator(1);
+  }
 }
 
 void CatchErrors(){
@@ -77,15 +96,62 @@ void SaveError(){
   
 }
 
-int debugMode=0;
 //0-left; 1-right
 void ClickHardware(int seatNum){
-  debugMode++;
-  if(debugMode>2)
-    debugMode = 0;
+  if(seatNum==0)
+  {
+    logS("Switch #"+seatNum);
+    digitalWrite(PIN_L_SWITCH, HIGH);
+    delay(50);
+    digitalWrite(PIN_L_SWITCH, LOW);
+  }
+  else if(seatNum==1)
+  {
+    logS("Switch #"+seatNum);
+    digitalWrite(PIN_R_SWITCH, HIGH);
+    delay(50);
+    digitalWrite(PIN_R_SWITCH, LOW);
+  }
 }
 
 int GetIndicator(int seatNum){
-  Serial.println(debugMode);
-  return debugMode;
+  if(seatNum==0)
+  {
+    bool L1=digitalRead(PIN_L_IND_1)==HIGH;
+    bool L2=digitalRead(PIN_L_IND_2)==HIGH;
+    logI("Seat #"+seatNum, Mode(L1, L2));
+    return Mode(L1, L2);
+  }
+  else if(seatNum==1)
+  {
+    bool R1=digitalRead(PIN_R_IND_1)==HIGH;
+    bool R2=digitalRead(PIN_R_IND_2)==HIGH;
+    logI("Seat #"+seatNum, Mode(R1, R2));
+    return Mode(R1, R2);
+  }
+}
+
+int Mode(bool i1, bool i2){
+  if(i1&!i2)
+    return 1;
+  else if(i2 & !i1)
+    return 2;
+  else if(i2 & i1)
+    return 3;
+  else
+    return 0;
+}
+
+void logI(String str, int i){
+  if(!isDebug)
+    return;
+  Serial.print(str);
+  Serial.print(" : ");
+  Serial.println(i);
+}
+
+void logS(String str){
+  if(!isDebug)
+    return;
+  Serial.println(str);
 }
