@@ -1,7 +1,7 @@
 #include <Wire.h>
 
-bool isDebug=false;
-bool isTest=true;
+bool isDebug=true;
+bool isTest=false;
 
 // адрес
 #define SLAVE_ADDR 10
@@ -13,13 +13,13 @@ bool isTest=true;
 #define REG_GetErrorCount 0x05
 #define REG_GetNextError 0x06
 
-#define PIN_L_SWITCH A6
-#define PIN_R_SWITCH A7
+#define PIN_L_SWITCH 9
+#define PIN_R_SWITCH 3
 
-#define PIN_L_IND_1 5
-#define PIN_L_IND_2 6
-#define PIN_R_IND_1 7
-#define PIN_R_IND_2 8
+#define PIN_L_IND_1 10
+#define PIN_L_IND_2 11
+#define PIN_R_IND_1 5
+#define PIN_R_IND_2 6
 
 int L_Mode=0;
 int R_Mode=0;
@@ -84,8 +84,8 @@ void loop() {
   int now = millis();
   if(now-LastCheck>1000*5)
   {
-    L_Mode=GetIndicator(0);
-    R_Mode=GetIndicator(1);
+    //L_Mode=ReadIndicator(0);
+    //R_Mode=ReadIndicator(1);
   }
 
   if(isTest){
@@ -106,14 +106,18 @@ void SaveError(){
 void ClickHardware(int seatNum){
   if(seatNum==0)
   {
-    logS("Switch #"+seatNum);
+    logS("Switch #0");
+    L_Mode++;
+    if(L_Mode>3) L_Mode=0;
     digitalWrite(PIN_L_SWITCH, HIGH);
     delay(50);
     digitalWrite(PIN_L_SWITCH, LOW);
   }
   else if(seatNum==1)
   {
-    logS("Switch #"+seatNum);
+    logS("Switch #1");
+    R_Mode++;
+    if(R_Mode>3) R_Mode=0;
     digitalWrite(PIN_R_SWITCH, HIGH);
     delay(50);
     digitalWrite(PIN_R_SWITCH, LOW);
@@ -122,17 +126,24 @@ void ClickHardware(int seatNum){
 
 int GetIndicator(int seatNum){
   if(seatNum==0)
+    return L_Mode;
+  else if(seatNum==1)
+    return R_Mode;
+}
+
+int ReadIndicator(int seatNum){
+  if(seatNum==0)
   {
     bool L1=digitalRead(PIN_L_IND_1)==HIGH;
     bool L2=digitalRead(PIN_L_IND_2)==HIGH;
-    logI("Seat #"+seatNum, Mode(L1, L2));
+    logI("Seat #0", Mode(L1, L2));
     return Mode(L1, L2);
   }
   else if(seatNum==1)
   {
     bool R1=digitalRead(PIN_R_IND_1)==HIGH;
     bool R2=digitalRead(PIN_R_IND_2)==HIGH;
-    logI("Seat #"+seatNum, Mode(R1, R2));
+    logI("Seat #1", Mode(R1, R2));
     return Mode(R1, R2);
   }
 }
