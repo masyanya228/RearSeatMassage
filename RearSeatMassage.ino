@@ -45,7 +45,7 @@ struct Error{
  * 15 - Недостоверный сигнал вентиляции слева
  * 16 - Недостоверный сигнал вентиляции справа
  */
-Error errors[2];
+Error errors[3];
 int sizeErr;
 int nextError=0;
 
@@ -220,6 +220,12 @@ int Mode(bool i1, bool i2){
     return 3;
   else
     return 0;
+}
+
+void SetupErrors(){
+  errors[0].code=13;
+  errors[1].code=14;
+  errors[2].code=15;
 }
 
 void logI(String str, int i){

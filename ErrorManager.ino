@@ -1,11 +1,14 @@
 void InitEEPROM(){
   EEPROM.get(0, errors);
   if(errors[0].code==0){
-    if(isDebug) Serial.println("EEPROM Init");
-    errors[0].code=300;
-    errors[1].code=301;
-    EEPROM.put(0, errors); 
+    ResetEEPROM();
   }
+}
+
+void ResetEEPROM(){
+  if(isDebug) Serial.println("EEPROM Init");
+  SetupErrors();
+  EEPROM.put(0, errors); 
 }
 
 void SaveError(uint16_t code){
@@ -51,8 +54,9 @@ void LogError(uint16_t code){
 }
 
 void SendHealth(){
+  int len=sizeof(errors) / sizeErr;
   uint8_t errorCount=0;
-  for(int i=0; i<2; i++){
+  for(int i=0; i<len; i++){
     if(errors[i].times>0)
     {
       errorCount++;
@@ -63,7 +67,8 @@ void SendHealth(){
 }
 
 void SendError(int i){
-  if(i>=2){
+  int len=sizeof(errors) / sizeErr;
+  if(i>=len){
     Wire.write(0);
     return;
   }
