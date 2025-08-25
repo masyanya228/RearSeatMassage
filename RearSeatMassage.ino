@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include <Wire.h>
 
 bool isDebug=true;
@@ -14,58 +15,86 @@ bool isTest=false;
 #define REG_GetNextError 0x06
 
 #define PIN_L_SWITCH 9
-#define PIN_R_SWITCH 3
+#define PIN_R_SWITCH 6
 
-#define PIN_L_IND_1 10
-#define PIN_L_IND_2 11
-#define PIN_R_IND_1 5
-#define PIN_R_IND_2 6
+#define PIN_L_IND_1 A0
+#define PIN_L_IND_2 A1
+#define PIN_R_IND_1 A2
+#define PIN_R_IND_2 A3
 
 int L_Mode=0;
 int R_Mode=0;
 int LastCheck=0;
 
-// последняя выбранная команда
-// в обработчике приёма
-uint8_t cmd = 0;
-// счётчик сообщений
-uint8_t counter = 0;
+uint8_t cmd = 0; //последняя команда
+uint8_t counter = 0; // счётчик сообщений
+
+uint32_t lastMessage=0;
+const int I2C_NoInputTimeOut = 30000; //30 секунд таймаута
+bool isOnline=false;
+bool isVoid=false;
+
+struct Error{
+  uint16_t code=0;
+  uint32_t tfs=0;
+  uint8_t times=0;
+};
+
+/* 13 - Связь не установлена
+ * 14 - Связь потеряна
+ * 15 - Недостоверный сигнал вентиляции слева
+ * 16 - Недостоверный сигнал вентиляции справа
+ */
+Error errors[2];
+int sizeErr;
+int nextError=0;
 
 // обработчик приёма
 void receiveCb(int amount) {
-    cmd = Wire.read();
-    ++counter;
+  cmd = Wire.read();
+  ++counter;
 
-    switch (cmd) {
-        case REG_L_MODE:
-            ClickHardware(0);
-            break;
-
-        case REG_R_MODE:
-            ClickHardware(1);
-            break;
-
-        case REG_L_GetStatus: break;
-        case REG_R_GetStatus: break;
-    }
+  switch (cmd) {
+    case REG_L_MODE:
+      ClickHardware(0);
+      break;
+    case REG_R_MODE:
+      ClickHardware(1);
+      break;
+    case REG_L_GetStatus: break;
+    case REG_R_GetStatus: break;
+    case REG_GetNextError:
+      nextError=Wire.read();
+      break;
+    case REG_GetErrorCount: break;
+  }
 }
 
 // обработчик запроса
 void requestCb() {
-    switch (cmd) {
-        case REG_L_MODE: 
-        case REG_L_GetStatus:
-          Wire.write(GetIndicator(0));
-          break;
-        case REG_R_MODE:
-        case REG_R_GetStatus:
-          Wire.write(GetIndicator(1));
-          break;
-    }
+  switch (cmd) {
+    case REG_L_MODE: 
+    case REG_L_GetStatus:
+      Wire.write(GetIndicator(0));
+      break;
+    case REG_R_MODE:
+    case REG_R_GetStatus:
+      Wire.write(GetIndicator(1));
+      break;
+    case REG_GetErrorCount:
+      SendHealth();
+      break;
+    case REG_GetNextError:
+      SendError(nextError);
+      break;
+  }
 }
 
 void setup() {
+  sizeErr=sizeof(errors[0]);
+  InitEEPROM();
   LastCheck=millis();
+  
   pinMode(PIN_L_SWITCH, OUTPUT);
   pinMode(PIN_R_SWITCH, OUTPUT);
   pinMode(PIN_L_IND_1, INPUT);
@@ -74,23 +103,37 @@ void setup() {
   pinMode(PIN_R_IND_2, INPUT);
   
   Serial.begin(9600);
+  
   Wire.begin(SLAVE_ADDR);
-
   Wire.onReceive(receiveCb);
   Wire.onRequest(requestCb);
 }
 
 void loop() {
+  if(isTest){
+    delay(4500);
+    ClickHardware(0);
+    delay(100);
+    ReadIndicator(0);
+  }
+  
   int now = millis();
   if(now-LastCheck>1000*5)
   {
-    //L_Mode=ReadIndicator(0);
-    //R_Mode=ReadIndicator(1);
+    L_Mode=ReadIndicator(0);
+    R_Mode=ReadIndicator(1);
+    LastCheck=now;
   }
-
-  if(isTest){
-    delay(2000);
-    ClickHardware(0);
+  if(!isVoid && !isOnline && lastMessage==0 && now>I2C_NoInputTimeOut)
+  {
+    isVoid=true;
+    SaveError(13);
+  }
+  if(!isVoid && isOnline && now-lastMessage>I2C_NoInputTimeOut)
+  {
+    isOnline=false;
+    isVoid=true;
+    SaveError(14);
   }
 }
 
@@ -134,17 +177,37 @@ int GetIndicator(int seatNum){
 int ReadIndicator(int seatNum){
   if(seatNum==0)
   {
-    bool L1=digitalRead(PIN_L_IND_1)==HIGH;
-    bool L2=digitalRead(PIN_L_IND_2)==HIGH;
-    logI("Seat #0", Mode(L1, L2));
-    return Mode(L1, L2);
+    int a1=analogRead(PIN_L_IND_1);
+    int a2=analogRead(PIN_L_IND_2);
+    logI("L_IND_1", a1);
+    logI("L_IND_2", a2);
+    bool ind1=a1>1024/12;
+    bool ind2=a2>1024/12;
+    int mode=Mode(ind1, ind2);
+    if(mode!=L_Mode)
+    {
+      SaveError(15);
+    }
+    
+    logI("Seat #0", mode);
+    return mode;
   }
   else if(seatNum==1)
   {
-    bool R1=digitalRead(PIN_R_IND_1)==HIGH;
-    bool R2=digitalRead(PIN_R_IND_2)==HIGH;
-    logI("Seat #1", Mode(R1, R2));
-    return Mode(R1, R2);
+    int a1=analogRead(PIN_R_IND_1);
+    int a2=analogRead(PIN_R_IND_2);
+    logI("R_IND_1", a1);
+    logI("R_IND_2", a2);
+    bool ind1=a1>1024/12;
+    bool ind2=a2>1024/12;
+    int mode=Mode(ind1, ind2);
+    if(mode!=R_Mode)
+    {
+      SaveError(16);
+    }
+    
+    logI("Seat #1", mode);
+    return mode;
   }
 }
 
