@@ -213,9 +213,9 @@ int ReadIndicator(int seatNum){
 
 int Mode(bool i1, bool i2){
   if(i1&!i2)
-    return 1;
-  else if(i2 & !i1)
     return 2;
+  else if(i2 & !i1)
+    return 1;
   else if(i2 & i1)
     return 3;
   else
