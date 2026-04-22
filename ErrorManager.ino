@@ -1,79 +1,87 @@
-void InitEEPROM(){
+#include <EEPROM.h>
+
+void InitEEPROM() {
+  sizeErr = sizeof(errors[0]);
+  errLen = sizeof(errors)/sizeErr;
+  if (false) {            // первый запуск
+    FirstInit();
+  }
+  LoadErrors();                     // загружаем текущее состояние
+}
+
+void FirstInit(){
+  if (isDebug) Serial.println(F("EEPROM Init - first run"));
+  int i = 0;
+  while (i < errLen) {
+      uint8_t code = pgm_read_byte(&errorDescriptions[i].code);
+      if (code == 0) break;
+
+      errors[i].code  = code;
+      errors[i].tfs   = 0;
+      errors[i].times = 0;
+      i++;
+  }
+  EEPROM.put(0, errors);
+  if (isDebug) Serial.print(F("Initialized ")); Serial.print(errLen); Serial.println(F(" error slots"));
+}
+
+void LoadErrors() {
   EEPROM.get(0, errors);
-  if(errors[0].code==0){
-    ResetEEPROM();
-  }
 }
 
-void ResetEEPROM(){
-  if(isDebug) Serial.println("EEPROM Init");
-  SetupErrors();
-  EEPROM.put(0, errors); 
-}
-
-void SaveError(uint16_t code){
-  logI("encountered", code);
-  int i = IndexOfError(code);
-  errors[i].times++;
-  EEPROM.update(sizeErr*i+2+4, errors[i].times);
-  if(errors[i].tfs==0){
-    errors[i].tfs=millis();
-    EEPROM.update(sizeErr*i+2, errors[i].tfs);
-  }
-}
-
-int IndexOfError(uint16_t code){
-  int len=sizeof(errors) / sizeErr;
-  for(int i=0; i<len; i++)
-  {
-    if(errors[i].code==code){
+int IndexOfError(uint8_t code) {
+  for (int i = 0; i < errLen; i++) {
+    if (errors[i].code == code) {
       return i;
     }
   }
   return -1;
 }
 
-void ResetError(uint16_t code){
-  int i = IndexOfError(code);
-  errors[i].tfs=0;
-  errors[i].times=0;
-  EEPROM.update(sizeErr*i+2+4, 0);
-  EEPROM.update(sizeErr*i+2, 0);
-  logI("reseted", code);
-}
-
-void LogError(uint16_t code){
-  if(!isDebug) return;
-  
-  int i = IndexOfError(code);
-  Serial.print(errors[i].code);
-  Serial.print(" ");
-  Serial.print(errors[i].tfs);
-  Serial.print(" ");
-  Serial.println(errors[i].times);
-}
-
-void SendHealth(){
-  int len=sizeof(errors) / sizeErr;
-  uint8_t errorCount=0;
-  for(int i=0; i<len; i++){
-    if(errors[i].times>0)
-    {
-      errorCount++;
+// Проверка, разрешён ли код ошибки
+bool IsErrorCodeAllowed(uint8_t code) {
+    for (int i = 0; ; i++) {
+        uint8_t c = pgm_read_byte(&errorDescriptions[i].code);
+        if (c == 0) break;
+        if (c == code) return true;
     }
-  }
-  I2C_writeAnything(errorCount);
-  I2C_writeAnything(millis());
+    return false;
 }
 
-void SendError(int i){
-  int len=sizeof(errors) / sizeErr;
-  if(i>=len){
-    Wire.write(0);
+void SaveError(uint8_t code) {
+  if (!IsErrorCodeAllowed(code)) {
+    if (isDebug) { Serial.print(F("Error code ")); Serial.print(code); Serial.println(F(" not allowed")); }
     return;
   }
-  Wire.write(1);
-  I2C_writeAnything(errors[i].code);
-  I2C_writeAnything(errors[i].tfs);
-  I2C_writeAnything(errors[i].times);
+  int i = IndexOfError(code);
+  if (i == -1){
+    Serial.print(F("Error code ")); Serial.print(code); Serial.println(F(" not searched"));
+    return;
+  }
+  
+  logI("encountered", code);
+
+  errors[i].times++;
+  if (errors[i].tfs == 0) {
+    errors[i].tfs = millis();
+  }
+  EEPROM.put(sizeErr * i, errors[i]);
+}
+
+void ClearAllErrors() {
+  for (int i = 0; i < errLen; i++) {
+    errors[i].tfs   = 0;
+    errors[i].times = 0;
+  }
+  EEPROM.put(0, errors);
+  if (isDebug) Serial.println(F("All errors cleared (times and tfs reset)"));
+}
+
+void ResetError(uint8_t code){
+  int i = IndexOfError(code);
+  if (i == -1) return;
+  errors[i].tfs=0;
+  errors[i].times=0;
+  EEPROM.put(sizeErr*i, errors[i]);
+  logI("reseted", code);
 }
