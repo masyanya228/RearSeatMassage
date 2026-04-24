@@ -153,8 +153,8 @@ byte ReadIndicator(byte seatNum){
   {
     int a1=analogRead(PIN_L_IND_1);
     int a2=analogRead(PIN_L_IND_2);
-    logI("L_IND_1", a1);
-    logI("L_IND_2", a2);
+    //logI("L_IND_1", a1);
+    //logI("L_IND_2", a2);
     bool ind1=a1>1024/12;
     bool ind2=a2>1024/12;
     byte mode=Mode(ind1, ind2);
@@ -170,8 +170,8 @@ byte ReadIndicator(byte seatNum){
   {
     int a1=analogRead(PIN_R_IND_1);
     int a2=analogRead(PIN_R_IND_2);
-    logI("R_IND_1", a1);
-    logI("R_IND_2", a2);
+    //logI("R_IND_1", a1);
+    //logI("R_IND_2", a2);
     bool ind1=a1>1024/12;
     bool ind2=a2>1024/12;
     byte mode=Mode(ind1, ind2);
@@ -199,10 +199,14 @@ byte Mode(bool i1, bool i2){
 //I2C commands
 void cmdMode(const uint8_t* buf, uint8_t len) {
   Serial.print("cmdMode ");
-  if (len < 2) { slave.respondByte(0x00); return; }
-  uint8_t seat = buf[1];
-  if (seat > 1) { slave.respondByte(0x00); return; }
+  if (len < 1) { slave.respondByte(0x00); return; }
+  uint8_t seat = 2;
+  if(buf[0]==REG_L_MODE)
+    seat=0;
+  if(buf[0]==REG_R_MODE)
+    seat=1;
   Serial.println(seat);
+  if (seat > 1) { slave.respondByte(0x00); return; }
   ClickHardware(seat);
   uint8_t ind=GetIndicator(seat);
   uint8_t resp[2] = {1, ind};
