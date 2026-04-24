@@ -146,6 +146,8 @@ byte GetIndicator(byte seatNum){
     return L_Mode;
   else if(seatNum==1)
     return R_Mode;
+  else
+    return 0;
 }
 
 byte ReadIndicator(byte seatNum){
@@ -215,8 +217,14 @@ void cmdMode(const uint8_t* buf, uint8_t len) {
 
 void cmdGetStatus(const uint8_t* buf, uint8_t len) {
   Serial.print("cmdGetStatus ");
-  uint8_t seat = buf[1];
+  if (len < 1) { slave.respondByte(0x00); return; }
+  uint8_t seat = 2;
+  if(buf[0]==REG_L_GetStatus)
+    seat=0;
+  if(buf[0]==REG_R_GetStatus)
+    seat=1;
   Serial.println(seat);
+  if (seat > 1) { slave.respondByte(0x00); return; }
   uint8_t ind=GetIndicator(seat);
   uint8_t resp[2] = {1, ind};
   slave.respond(resp, sizeof(resp));
@@ -261,7 +269,7 @@ void cmdGetError(const uint8_t* buf, uint8_t len) {
 
 void cmdClearErrors(const uint8_t*, uint8_t) {
   Serial.println("cmdClearErrors");
-  memset(errors, 0, sizeof(errors));
+  ClearAllErrors();
   slave.respondByte(0x01);
 }
 
