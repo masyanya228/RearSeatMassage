@@ -35,8 +35,8 @@ struct ErrorDesc {
     const char* description;
 };
 const ErrorDesc errorDescriptions[] PROGMEM = {
-    {11,   "Left seat wrong state"},
-    {12,   "Right seat wrong state"},
+    {11,   "Left massage wrong state"},
+    {12,   "Right massage wrong state"},
     {0,   ""}   // terminator (обязательно в конце!)
 };
 
