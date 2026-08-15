@@ -2,8 +2,8 @@
 
 bool isDebug=true;
 bool isTest=false;
-int testTimer=0;
-int LastCheck=0;
+uint32_t testTimer=0;
+uint32_t LastCheck=0;
 
 I2CSlave slave;
 
