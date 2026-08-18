@@ -136,7 +136,7 @@ byte ReadIndicator(byte seatNum){
     byte mode=Mode(ind1, ind2);
     if(mode!=R_Mode)
     {
-      Serial.println("Режим левого массажа изменился");
+      Serial.println("Режим правого массажа изменился");
     }
     R_Mode=mode;
     
