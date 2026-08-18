@@ -80,8 +80,8 @@ void ClickHardware(byte seatNum){
   if(seatNum==0)
   {
     logS("Switch #0");
-    L_Mode++;
-    if(L_Mode>3) L_Mode=0;
+    L_Mode--;
+    if(L_Mode<0) L_Mode=3;
     digitalWrite(PIN_L_SWITCH, HIGH);
     delay(50);
     digitalWrite(PIN_L_SWITCH, LOW);
@@ -89,8 +89,8 @@ void ClickHardware(byte seatNum){
   else if(seatNum==1)
   {
     logS("Switch #1");
-    R_Mode++;
-    if(R_Mode>3) R_Mode=0;
+    R_Mode--;
+    if(R_Mode<0) R_Mode=3;
     digitalWrite(PIN_R_SWITCH, HIGH);
     delay(50);
     digitalWrite(PIN_R_SWITCH, LOW);
@@ -149,9 +149,9 @@ byte Mode(bool i1, bool i2){
   if(i1&!i2)
     return 2;
   else if(i2 & !i1)
-    return 1;
-  else if(i2 & i1)
     return 3;
+  else if(i2 & i1)
+    return 1;
   else
     return 0;
 }
